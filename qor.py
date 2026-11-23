@@ -2103,6 +2103,7 @@ class Rope:
         if hit:
             self.awake = True
             self.calm = 0
+            self.awake_t = 0
         return hit
 
     def step(self, wind, t):
@@ -2254,7 +2255,7 @@ class SpanView:
 
 class Bulb:
     __slots__ = ("sock", "r1", "r2", "rim", "mid", "core", "hot", "fil", "lvl", "k",
-                 "f", "th0", "a", "av", "ax", "vxp", "cx", "cy")
+                 "f", "th0", "a", "av", "ax", "vxp", "cx", "cy", "lx", "ly", "lth")
 
 
 class App:
@@ -2996,6 +2997,7 @@ class App:
                 bl.f, bl.th0, bl.a, bl.av = f, th0, 0.0, 0.0
                 bl.ax, bl.vxp = x, 0.0
                 bl.cx, bl.cy = cen
+                bl.lx, bl.ly, bl.lth = x, y, th0
                 bl.k = k
                 bl.lvl = -1
                 k += 1
@@ -3041,6 +3043,7 @@ class App:
                         bl.av += max(-0.08, min(0.08, cvx * 0.004))
                         rope.awake = True
                         rope.calm = 0
+                        rope.awake_t = 0
             if sway:
                 for b in w.balls:                     # otilgan sharcha ham turtadi
                     if (b.y < top and abs(b.vx) + abs(b.vy) > 4 * S
@@ -3050,6 +3053,12 @@ class App:
                 rope.awake = True
                 rope.calm = 0
             if not rope.awake:
+                continue
+            # shamolda sim hech qachon to'liq tinchimaydi: turtkidan ~3 soniyadan keyin uxlatamiz
+            rope.awake_t = getattr(rope, "awake_t", 0) + 1
+            if rope.awake_t > 90 and not gusty:
+                rope.awake = False
+                rope.awake_t = 0
                 continue
             rope.step(wind_ps, t)
             P, cum = rope.polyline()
@@ -3068,8 +3077,12 @@ class App:
                        + (0.005 * w.wind_n if sway else 0.0))    # shamol lampochkani biroz og'diradi
                 bl.av = max(-0.25, min(0.25, bl.av + acc))
                 bl.a = max(-0.8, min(0.8, bl.a + bl.av))
-                self._place_bulb(bl, x, y, bl.th0 + bl.a)
-                if abs(bl.av) > 0.006 or abs(bl.a) > 0.02:
+                th_ = bl.th0 + bl.a
+                if (abs(x - bl.lx) > 0.25 or abs(y - bl.ly) > 0.25
+                        or abs(th_ - bl.lth) > 0.012):     # sezilarsiz siljishda 8 ta Tk chaqiruvi kerak emas
+                    self._place_bulb(bl, x, y, th_)
+                    bl.lx, bl.ly, bl.lth = x, y, th_
+                if abs(bl.av) > 0.006:
                     quiet = False
             rope.calm = rope.calm + 1 if quiet else 0
             if rope.calm >= 12:
